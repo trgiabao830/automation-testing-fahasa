@@ -7,8 +7,6 @@ allure-results/
 
 allure-report/
 
-test-results/
-
 .pytest_cache/
 
 __pycache__/
@@ -22,5 +20,3 @@ env/
 
 .vscode/
 .idea/
-*.swp
-*.swo
