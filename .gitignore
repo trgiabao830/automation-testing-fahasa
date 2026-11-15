@@ -6,6 +6,8 @@ data/*.json
 allure-results/
 allure-report/
 
+screenshots/
+
 .pytest_cache/
 
 __pycache__/

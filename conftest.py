@@ -7,6 +7,8 @@ from playwright.sync_api import Playwright, Page
 
 AUTH_FILE = ".auth/state.json"
 
+pytest_plugins = ["utils.screenshot_hook"]
+
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_auth_state(playwright: Playwright):
@@ -52,32 +54,3 @@ def auth_page(browser):
     page = context.new_page()
     yield page
     context.close()
-
-
-@pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    """
-    Hook này tự động chạy sau mỗi bước của một test case.
-    Chụp ảnh màn hình đính kèm vào Allure Report nếu test bị faileđ.
-    """
-    outcome = yield
-    report = outcome.get_result()
-
-    if report.when == "call" and report.failed:
-        page = None
-
-        for arg_name, arg_val in item.funcargs.items():
-            if hasattr(arg_val, "page"):
-                page = arg_val.page
-                break
-            elif arg_name in ["page", "auth_page"]:
-                page = arg_val
-                break
-
-        if page:
-            screenshot_bytes = page.screenshot(full_page=True)
-            allure.attach(
-                screenshot_bytes,
-                name=f"Screenshot_Error_{item.name}",
-                attachment_type=allure.attachment_type.PNG,
-            )
