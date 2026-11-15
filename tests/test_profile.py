@@ -3,7 +3,7 @@ import allure
 import pytest
 from pathlib import Path
 from playwright.sync_api import Page, expect
-from pages.profile_page import ProfileActions
+from actions.profile_action import ProfileActions
 
 
 def load_profile_data():
@@ -13,6 +13,9 @@ def load_profile_data():
 
 
 TEST_DATA = load_profile_data()
+VALID_INPUTS = TEST_DATA["valid_inputs"]
+INVALID_INPUTS = TEST_DATA["invalid_inputs"]
+EXPECTED_MESSAGES = TEST_DATA["expected_messages"]
 
 
 @pytest.fixture
@@ -28,9 +31,9 @@ def profile_actions(auth_page: Page):
 @pytest.mark.parametrize(
     "lastname_val, firstname_val, locator_name",
     [
-        ("", TEST_DATA["valid_inputs"]["firstname"], "lastname_error"),  # TC1: Trống Họ
+        ("", VALID_INPUTS["firstname"], "lastname_error"),  # TC1: Trống Họ
         (
-            TEST_DATA["valid_inputs"]["lastname"],
+            VALID_INPUTS["lastname"],
             "",
             "firstname_error",
         ),  # TC2: Trống Tên
@@ -44,13 +47,13 @@ def test_empty_fields(
     allure.dynamic.title(f"Cập nhật thất bại do để trống trường: {field_name}")
 
     # Action
-    profile_actions.update_profile(lastname_val, firstname_val)
+    profile_actions.fill_lastname(lastname_val)
+    profile_actions.fill_firstname(firstname_val)
+    profile_actions.click_save_button()
 
     # Assert
-    expected_msg = TEST_DATA["expected_messages"]["empty_field"]
-
     error_locator = getattr(profile_actions.locators, locator_name)
-    expect(error_locator).to_have_text(expected_msg)
+    expect(error_locator).to_have_text(EXPECTED_MESSAGES["empty_field"])
 
 
 @allure.epic("Account Management")
@@ -69,14 +72,15 @@ def test_empty_fields(
 def test_invalid_characters_format(profile_actions: ProfileActions, input_key):
     allure.dynamic.title(f"Cập nhật thất bại do sai định dạng Họ Tên - {input_key}")
 
-    invalid_str = TEST_DATA["invalid_inputs"][input_key]
-
     # Action
-    profile_actions.update_profile(invalid_str, invalid_str)
+    profile_actions.fill_lastname(INVALID_INPUTS[input_key])
+    profile_actions.fill_firstname(INVALID_INPUTS[input_key])
+    profile_actions.click_save_button()
 
     # Assert
-    expected_msg = TEST_DATA["expected_messages"]["invalid_characters"]
-    expect(profile_actions.locators.error_message).to_have_text(expected_msg)
+    expect(profile_actions.locators.error_message).to_have_text(
+        EXPECTED_MESSAGES["invalid_characters"]
+    )
 
 
 # TC7: Cập nhật thành công
@@ -86,10 +90,13 @@ def test_invalid_characters_format(profile_actions: ProfileActions, input_key):
 @allure.title("Cập nhật thông tin Profile thành công")
 @allure.severity(allure.severity_level.CRITICAL)
 def test_update_profile_success(profile_actions: ProfileActions):
-    valid_last = TEST_DATA["valid_inputs"]["lastname"]
-    valid_first = TEST_DATA["valid_inputs"]["firstname"]
 
-    profile_actions.update_profile(valid_last, valid_first)
+    # Action
+    profile_actions.fill_lastname(VALID_INPUTS["lastname"])
+    profile_actions.fill_firstname(VALID_INPUTS["firstname"])
+    profile_actions.click_save_button()
 
-    expected_msg = TEST_DATA["expected_messages"]["update_success"]
-    expect(profile_actions.locators.success_message).to_have_text(expected_msg)
+    # Assert
+    expect(profile_actions.locators.success_message).to_have_text(
+        EXPECTED_MESSAGES["update_success"]
+    )

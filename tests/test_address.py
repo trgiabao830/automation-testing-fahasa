@@ -3,7 +3,7 @@ import allure
 import pytest
 from pathlib import Path
 from playwright.sync_api import Page, expect
-from pages.address_page import AddressActions
+from actions.address_action import AddressActions
 
 
 def load_address_data():
@@ -13,6 +13,9 @@ def load_address_data():
 
 
 TEST_DATA = load_address_data()
+VALID_INPUTS = TEST_DATA["valid_inputs"]
+INVALID_INPUTS = TEST_DATA["invalid_inputs"]
+EXPECTED_MESSAGES = TEST_DATA["expected_messages"]
 
 
 @pytest.fixture
@@ -47,28 +50,29 @@ def test_empty_single_field(
     address_actions.click_add_new_address()
 
     # Điền tất cả, trừ field bị loại trừ
-    ln = "" if omit_field == "lastname" else TEST_DATA["valid_inputs"]["lastname"]
-    fn = "" if omit_field == "firstname" else TEST_DATA["valid_inputs"]["firstname"]
-    ph = "" if omit_field == "phone" else TEST_DATA["valid_inputs"]["phone"]
-    st = "" if omit_field == "street" else TEST_DATA["valid_inputs"]["street"]
+    ln = "" if omit_field == "lastname" else VALID_INPUTS["lastname"]
+    fn = "" if omit_field == "firstname" else VALID_INPUTS["firstname"]
+    ph = "" if omit_field == "phone" else VALID_INPUTS["phone"]
+    st = "" if omit_field == "street" else VALID_INPUTS["street"]
 
+    # Action
     address_actions.fill_contact_info(ln, fn, ph)
-    address_actions.fill_street_and_zip(st, TEST_DATA["valid_inputs"]["zipcode"])
+    address_actions.fill_street_and_zip(st, VALID_INPUTS["zipcode"])
 
     # Xử lý Dropdown
     if omit_field != "region":
-        address_actions.select_location(region=TEST_DATA["valid_inputs"]["region"])
+        address_actions.select_location(region=VALID_INPUTS["region"])
         address_actions.page.wait_for_timeout(500)
         address_actions.select_location(
-            city=TEST_DATA["valid_inputs"]["city"],
-            ward=TEST_DATA["valid_inputs"]["ward"],
+            city=VALID_INPUTS["city"],
+            ward=VALID_INPUTS["ward"],
         )
 
     address_actions.submit_address()
 
     # Lấy đúng locator báo lỗi tương ứng để Assert
     error_locator = getattr(address_actions.locators, error_locator_name)
-    expect(error_locator).to_have_text(TEST_DATA["expected_messages"][expected_msg_key])
+    expect(error_locator).to_have_text(EXPECTED_MESSAGES[expected_msg_key])
 
 
 @allure.epic("Account Management")
@@ -90,13 +94,11 @@ def test_invalid_phone_native_validation(
         f"Thêm địa chỉ thất bại do sai định dạng SĐT (Bắt JS) - {invalid_key}"
     )
 
-    invalid_phone = TEST_DATA["invalid_inputs"]["phones"][invalid_key]
-
     address_actions.click_add_new_address()
     address_actions.fill_contact_info(
-        TEST_DATA["valid_inputs"]["lastname"],
-        TEST_DATA["valid_inputs"]["firstname"],
-        invalid_phone,
+        VALID_INPUTS["lastname"],
+        VALID_INPUTS["firstname"],
+        INVALID_INPUTS["phones"][invalid_key],
     )
     address_actions.submit_address()
 
@@ -104,7 +106,7 @@ def test_invalid_phone_native_validation(
     actual_validation_msg = address_actions.get_phone_native_validation_message()
 
     # 2. Lấy chuỗi mong đợi từ JSON
-    expected_msg_prefix = TEST_DATA["expected_messages"][expected_msg_key]
+    expected_msg_prefix = EXPECTED_MESSAGES[expected_msg_key]
 
     # 3. Kiểm chứng
     assert expected_msg_prefix in actual_validation_msg
@@ -124,21 +126,20 @@ def test_invalid_phone_native_validation(
 def test_change_default_address(address_actions: AddressActions, default_type):
     allure.dynamic.title(f"Thay đổi địa chỉ mặc định thành công - Dạng: {default_type}")
 
-    new_default = TEST_DATA["new_default_address"]
+    NEW_DEFAULT = TEST_DATA["new_default_address"]
 
+    # Action
     address_actions.click_add_new_address()
 
     address_actions.fill_contact_info(
-        new_default["lastname"], new_default["firstname"], new_default["phone"]
+        NEW_DEFAULT["lastname"], NEW_DEFAULT["firstname"], NEW_DEFAULT["phone"]
     )
-    address_actions.fill_street_and_zip(
-        new_default["street"], TEST_DATA["valid_inputs"]["zipcode"]
-    )
+    address_actions.fill_street_and_zip(NEW_DEFAULT["street"], VALID_INPUTS["zipcode"])
     address_actions.select_location(
-        country=new_default["country"], region=new_default["region"]
+        country=NEW_DEFAULT["country"], region=NEW_DEFAULT["region"]
     )
     address_actions.page.wait_for_timeout(500)  # Đợi API load Quận/Huyện
-    address_actions.select_location(city=new_default["city"], ward=new_default["ward"])
+    address_actions.select_location(city=NEW_DEFAULT["city"], ward=NEW_DEFAULT["ward"])
 
     if default_type == "billing":
         address_actions.set_as_default_billing()
@@ -146,12 +147,14 @@ def test_change_default_address(address_actions: AddressActions, default_type):
         address_actions.set_as_default_shipping()
 
     address_actions.submit_address()
+
+    # Assert:
     expect(address_actions.locators.success_message).to_have_text(
-        TEST_DATA["expected_messages"]["update_success"]
+        EXPECTED_MESSAGES["update_success"]
     )
 
     actual_details = address_actions.get_address_card_details(card_type=default_type)
-    expected_fullname = f"{new_default['lastname']} {new_default['firstname']}"
+    expected_fullname = f"{NEW_DEFAULT['lastname']} {NEW_DEFAULT['firstname']}"
 
     assert actual_details["fullname"] == expected_fullname
 
@@ -163,30 +166,31 @@ def test_change_default_address(address_actions: AddressActions, default_type):
 @allure.title("Thêm mới địa chỉ thành công (Không set mặc định)")
 @allure.severity(allure.severity_level.CRITICAL)
 def test_add_new_address_success(address_actions: AddressActions):
+
+    # Action
     address_actions.click_add_new_address()
 
     address_actions.fill_contact_info(
-        TEST_DATA["valid_inputs"]["lastname"],
-        TEST_DATA["valid_inputs"]["firstname"],
-        TEST_DATA["valid_inputs"]["phone"],
+        VALID_INPUTS["lastname"],
+        VALID_INPUTS["firstname"],
+        VALID_INPUTS["phone"],
     )
-    address_actions.fill_street_and_zip(
-        TEST_DATA["valid_inputs"]["street"], TEST_DATA["valid_inputs"]["zipcode"]
-    )
+    address_actions.fill_street_and_zip(VALID_INPUTS["street"], VALID_INPUTS["zipcode"])
 
     address_actions.select_location(
-        country=TEST_DATA["valid_inputs"]["country"],
-        region=TEST_DATA["valid_inputs"]["region"],
+        country=VALID_INPUTS["country"],
+        region=VALID_INPUTS["region"],
     )
     address_actions.page.wait_for_timeout(300)  # Đợi API load Quận/Huyện
     address_actions.select_location(
-        city=TEST_DATA["valid_inputs"]["city"], ward=TEST_DATA["valid_inputs"]["ward"]
+        city=VALID_INPUTS["city"], ward=VALID_INPUTS["ward"]
     )
 
     address_actions.submit_address()
 
+    # Assert
     expect(address_actions.locators.success_message).to_have_text(
-        TEST_DATA["expected_messages"]["update_success"]
+        EXPECTED_MESSAGES["update_success"]
     )
 
 
@@ -196,18 +200,19 @@ def test_add_new_address_success(address_actions: AddressActions):
 @allure.story("Address Management Luồng Chính")
 @allure.title("Sửa địa chỉ thanh toán mặc định hiện có thành công")
 def test_update_default_address(address_actions: AddressActions):
-    new_street = TEST_DATA["edit_address"]["new_street"]
 
+    # Action
     address_actions.click_edit_billing_address()  # Click nút sửa
     address_actions.fill_street_and_zip(
-        new_street, TEST_DATA["valid_inputs"]["zipcode"]
+        TEST_DATA["edit_address"]["new_street"], VALID_INPUTS["zipcode"]
     )
     address_actions.submit_address()
 
+    # Assert
     expect(address_actions.locators.success_message).to_have_text(
-        TEST_DATA["expected_messages"]["update_success"]
+        EXPECTED_MESSAGES["update_success"]
     )
 
     # Kiểm tra UI thẻ địa chỉ có cập nhật đúng đường vừa sửa chưa
     actual_details = address_actions.get_address_card_details(card_type="billing")
-    assert actual_details["street"] == new_street
+    assert actual_details["street"] == TEST_DATA["edit_address"]["new_street"]
